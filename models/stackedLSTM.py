@@ -195,13 +195,13 @@ class StackedLSTM:
                     step += 1
                 print("Optimization Finished!")
                 targetSavePath = "models/savedModels/" + self.modelName # need the underscore
-                if (not os.path.isdir(targetSavePath)):
-                    os.mkdir(targetSavePath)
+                #if (not os.path.isdir(targetSavePath)):
+                #    os.mkdir(targetSavePath)
                 #save_path = saver.save(sess, targetSavePath+"/"+self.modelName)
-                save_path = saver.save(sess, targetSavePath)
+                #save_path = saver.save(sess, targetSavePath)
 
                 #print("Saving to : " + save_path)
-                print("Saving to: " + save_path)
+                print("\"Not\" Saving to: " + targetSavePath)
         else:
             print("*** stackedLSTM says: Network Parameters are not set or no dataFile target given.")
 
@@ -237,7 +237,6 @@ class StackedLSTM:
                 plt.ylim([0,0.6])
                 plt.xlabel('time [t]')
                 plt.ylabel(self.dataFileTarget)
-
             plt.show()
 
     def forecastGiven(self, lookBackData):

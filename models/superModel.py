@@ -8,6 +8,7 @@ import models.workingNN as NN
 import numpy as np
 import csv
 import math
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -24,13 +25,13 @@ class renewableModel:
 
         # TODO
         # Have this decrease each time its called
-        self.testNum            = "11"      # Increase this each time
-        self.highNoiseTarget    = 2
-        self.medNoiseTarget     = 2
-        self.lowNoiseTarget     = 2
+        self.testNum            = "12"      # Increase this each time
+        self.highNoiseTarget    = .0009
+        self.medNoiseTarget     = .0002
+        self.lowNoiseTarget     = .00004
         self.highNoiseFeatures  = ["events", "gust_speed", "power_EMA60", "power_EMA90", "conditions", "wind_dir", "power_out_prev"]
-        self.medNoiseFeatures   = ["power_MA10", "power_MA25", "dew_point", "visibility", "wind_speed", "temp", "humidity"]
-        self.lowNoiseFeatures   = ["pressure", "precip", "power_EMA30", "power_MA50"]
+        self.medNoiseFeatures   = ["power_MA10", "power_MA25", "dew_point", "visibility", "wind_speed" , "humidity"]
+        self.lowNoiseFeatures   = ["pressure", "precip", "power_EMA30", "power_MA50", "temp"]
 
 
         self.config()
@@ -100,7 +101,7 @@ class renewableModel:
         lookBackDataFeature, futureFeature, actual_Y = self.getSuperTestData(maxBatchSize, maxYSize)
 
 
-        numTests = 1
+        numTests = 10
         masterTest_Accuracy_Avg = 0
         for k in range(numTests):
             numOfFeats = self.getNumOfFeats()
@@ -153,7 +154,7 @@ class renewableModel:
                     eclud_distance = math.sqrt((math.fabs((act_Y-pred_Y)**2 -  timestep)))
                     difference.append(eclud_distance)
 
-                    wr.writerow([["curr_classification_"+str(timestep) + "_testNumer: " +""str(k)], curr_classification])
+                    wr.writerow([["curr_classification_"+str(timestep) + "_testNumer: " + str(k)], curr_classification])
                     forecasted_Power.append(curr_classification)
 
                 wr.writerow([["Actual y: "], actual_Y])
@@ -163,11 +164,19 @@ class renewableModel:
                     time = [x for x in range(num_timeSteps)]
                     actY = np.squeeze(actual_Y)
                     actY = actY.tolist()
-                    plt.plot(time,actY, color='green', linestyle=':' )
+                    plt.plot(time,actY, color='green', linestyle=':')
                     forecasts = np.squeeze(forecasted_Power).tolist()
-                    plt.plot(time,forecasts, color='red' )
+                    plt.plot(time,forecasts, color='red')
                     plt.show()
-
+####
+                    try:
+                        plt.savefig('superModel_Results_' + str(self.num) + '_' + str(k) + '.png')
+                    except:
+                        try:
+                            plt.savefig('superModel_Results_' + str(self.num) + '_' + str(k) + '.pdf')
+                        except:
+                            print("Could not save figure.")
+####
                 masterTest_Accuracy_Avg+= math.fsum(difference)
 
             print("forecasted_Power: ", forecasted_Power)
@@ -193,7 +202,7 @@ class renewableModel:
         # thread each model for training
         # continue training until NN > 95%
         if (state == 0):
-            NN_targetAcc = 0
+            NN_targetAcc = .97
             self.NN.train(NN_targetAcc)
 
         i = 0;
@@ -221,19 +230,19 @@ class renewableModel:
         for column in self.dataFrame:
             if column != "power_output": # TODO maybe don't include moving averages
                 self.countFeats+=1
-                
-                curr_lstm = modelBuilder_LSTM.StackedLSTM(dataFrame=self.dataFrame[column], modelName=(column + "/" + column + self.testNum))
 
+                curr_lstm = modelBuilder_LSTM.StackedLSTM(dataFrame=self.dataFrame[column], modelName=(column + "/" + column + self.testNum))
+###
                 if column in self.highNoiseFeatures:
-                    curr_lstm.networkParams(column, n_steps=20, n_layers=4) # can pass in custom configurations Note: necessary to call this function
+                    curr_lstm.networkParams(column, n_steps=14, n_layers=4) # can pass in custom configurations Note: necessary to call this function
                     self.LSTM_Models.append(curr_lstm)
                 elif column in self.medNoiseFeatures:
-                    curr_lstm.networkParams(column, n_steps=40, n_layers=4) # can pass in custom configurations Note: necessary to call this function
+                    curr_lstm.networkParams(column, n_steps=12, n_layers=4) # can pass in custom configurations Note: necessary to call this function
                     self.LSTM_Models.append(curr_lstm)
                 elif column in self.lowNoiseFeatures:
-                    curr_lstm.networkParams(column, n_steps=18, n_layers=3) # can pass in custom configurations Note: necessary to call this function
+                    curr_lstm.networkParams(column, n_steps=7, n_layers=4) # can pass in custom configurations Note: necessary to call this function
                     self.LSTM_Models.append(curr_lstm)
-
+###
         # start training the models
         self.train(0)
 
@@ -248,7 +257,7 @@ class superModel:
     def __init__(self, numOfRenewables):
         self.renewableModels = []
         for i in range(numOfRenewables):
-            self.renewableModels.append(renewableModel(i, "prod_Data/training_Data.csv"))
+            self.renewableModels.append(renewableModel(i, "prod_Data/training_Data12.csv"))
         self.renewableModels[0].printID()
 
 if __name__ == "__main__":
@@ -279,9 +288,23 @@ if __name__ == "__main__":
             #     0.97  % NN, .0001 loss lstm decrements by 0.01 if testing does not meet requirements
             #     n_steps=18,n_layers=4
             # 11
-            # self.highNoiseTarget    = .001            n_steps=20, n_layers=4
-            # self.medNoiseTarget     = .0001           n_steps=40, n_layers=4
+            #* self.highNoiseTarget    = .001            n_steps=20, n_layers=4
+            #* self.medNoiseTarget     = .0001           n_steps=40, n_layers=4
             # self.lowNoiseTarget     = .00001          n_steps=18, n_layers=3
             # self.highNoiseFeatures  = ["events", "gust_speed", "power_EMA60", "power_EMA90", "conditions", "wind_dir", "power_out_prev"]
             # self.medNoiseFeatures   = ["power_MA10", "power_MA25", "dew_point", "visibility", "wind_speed", "temp", "humidity"]
             # self.lowNoiseFeatures   = ["pressure", "precip", "power_EMA30", "power_MA50"]
+            # 12
+            # self.highNoiseTarget    = .0009           n_steps=8, n_layers=4
+            # self.medNoiseTarget     = .0001           n_steps=24, n_layers=4
+            #* self.lowNoiseTarget     = .00001          n_steps=11, n_layers=4
+            # self.highNoiseFeatures  = ["events", "gust_speed", "power_EMA60", "power_EMA90", "conditions", "wind_dir", "power_out_prev"]
+            # self.medNoiseFeatures   = ["power_MA10", "power_MA25", "dew_point", "visibility", "wind_speed" , "humidity"]
+            # self.lowNoiseFeatures   = ["pressure", "precip", "power_EMA30", "power_MA50", "temp"]
+            # 13
+            # self.highNoiseTarget    = .0009           n_steps=14, n_layers=4
+            # self.medNoiseTarget     = .0002           n_steps=12, n_layers=4
+            # self.lowNoiseTarget     = .00004          n_steps=7, n_layers=4
+            # self.highNoiseFeatures  = ["events", "gust_speed", "power_EMA60", "power_EMA90", "conditions", "wind_dir", "power_out_prev"]
+            # self.medNoiseFeatures   = ["power_MA10", "power_MA25", "dew_point", "visibility", "wind_speed" , "humidity"]
+            # self.lowNoiseFeatures   = ["pressure", "precip", "power_EMA30", "power_MA50", "temp"]
