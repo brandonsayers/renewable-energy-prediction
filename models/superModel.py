@@ -25,7 +25,7 @@ class renewableModel:
 
         # TODO
         # Have this decrease each time its called
-        self.testNum            = "12"      # Increase this each time
+        self.testNum            = "14"      # Increase this each time
         self.highNoiseTarget    = .0009
         self.medNoiseTarget     = .0002
         self.lowNoiseTarget     = .00004
@@ -98,10 +98,9 @@ class renewableModel:
             if (self.LSTM_Models[i].n_outputs > maxYSize):
                 maxYSize = self.LSTM_Models[i].n_outputs
 
-        lookBackDataFeature, futureFeature, actual_Y = self.getSuperTestData(maxBatchSize, maxYSize)
+        #lookBackDataFeature, futureFeature, actual_Y = self.getSuperTestData(maxBatchSize, maxYSize)
 
-
-        numTests = 10
+        numTests = 5
         masterTest_Accuracy_Avg = 0
         for k in range(numTests):
             numOfFeats = self.getNumOfFeats()
@@ -122,33 +121,45 @@ class renewableModel:
                 # of the accuracy for each LSTM model.
                 # investigate the code to figure out how to get it to work...
                 # OR you can just do a straight up comparison in excel... but i woulnd't recommend that lol
-                forecastForFeat_i = self.LSTM_Models[i].forecastGiven(lookBackData)
+                forecastForFeat_i = self.LSTM_Models[i].forecastGiven(lookBackData, futureFeature[i], self.testNum, k)
                 features_forecasts.append(forecastForFeat_i)
 
             print("features_forecasts:", features_forecasts)
 
             forecasted_Power = []
+            NNOnlyForecast = []
             testResults = []
             num_timeSteps = maxYSize
             difference = []
             graphTheTest = True
 
-            with open('resUlts/superModel_Results_'+str(self.testNum), 'w') as csvFile:
+            with open('resUlts/superModel_Results_'+str(self.testNum) + "_" + str(k), 'w') as csvFile:
                 wr = csv.writer(csvFile, delimiter=",")
                 renewableModel_Test_accuracy_MA = self.renewableModel_Test_accuracy
                 # while renewableModel_Test_accuracy_MA < 0.50
 
                 for timestep in range(num_timeSteps):
                     currFeatsInTimestep = []
+                    actualFeatsInTimestep = []
                     for feature in features_forecasts:
                         currFeatsInTimestep.append(feature[0][timestep])
-                    currFeatsInTimestep.append(feature[0][0])
+                    for act_feature in futureFeature:
+                        actualFeatsInTimestep.append(act_feature[timestep])
+
+                    currFeatsInTimestep.append(feature[0][0]) # Shouldnt have to do this but just a quick hack to get it to work..
+                    actualFeatsInTimestep.append(feature[0][0])
                     wr.writerow([["currFeatsInTimestep_"+str(timestep)], currFeatsInTimestep])
                     print("Feats in timestep: " + str(timestep), currFeatsInTimestep)
                     print("currFeatsInTimestep :", currFeatsInTimestep)
 
 
                     curr_classification = self.NN.classifySetOf(currFeatsInTimestep)
+
+                    # run the actual features in the future through the NN
+                    prep = np.squeeze(actualFeatsInTimestep).tolist()
+                    withRealFeatsClassification = self.NN.classifySetOf(prep)
+                    NNOnlyForecast.append(withRealFeatsClassification)
+
                     act_Y = actual_Y[timestep][0]
                     pred_Y = curr_classification[0]
                     eclud_distance = math.sqrt((math.fabs((act_Y-pred_Y)**2 -  timestep)))
@@ -158,25 +169,25 @@ class renewableModel:
                     forecasted_Power.append(curr_classification)
 
                 wr.writerow([["Actual y: "], actual_Y])
+                wr.writerow([["Actual features: "], futureFeature])
 
                 if (graphTheTest):
                     #plt.subplot(numTests, 1, k)
                     time = [x for x in range(num_timeSteps)]
                     actY = np.squeeze(actual_Y)
                     actY = actY.tolist()
-                    plt.plot(time,actY, color='green', linestyle=':')
+
+                    plt.plot(time,actY, color='green')
                     forecasts = np.squeeze(forecasted_Power).tolist()
-                    plt.plot(time,forecasts, color='red')
-                    plt.show()
-####
-                    try:
-                        plt.savefig('superModel_Results_' + str(self.num) + '_' + str(k) + '.png')
-                    except:
-                        try:
-                            plt.savefig('superModel_Results_' + str(self.num) + '_' + str(k) + '.pdf')
-                        except:
-                            print("Could not save figure.")
-####
+                    plt.plot(time,forecasts, color='red' , linestyle=':')
+                    NNOnlyResults = np.squeeze(NNOnlyForecast).tolist()
+                    plt.plot(time, NNOnlyResults, color='blue', linestyle=':')
+                    plotName = "ActualY_vs_Predicted_NN_"+self.testNum+"_"+str(k)+".svg"
+                    plt.xlabel('time')
+                    plt.ylabel('poweroutput')
+                    plt.title(plotName)
+                    plt.savefig("graphs/NN/"+plotName, format="svg" )
+                    #plt.show()
                 masterTest_Accuracy_Avg+= math.fsum(difference)
 
             print("forecasted_Power: ", forecasted_Power)
@@ -202,7 +213,7 @@ class renewableModel:
         # thread each model for training
         # continue training until NN > 95%
         if (state == 0):
-            NN_targetAcc = .97
+            NN_targetAcc = 0.975
             self.NN.train(NN_targetAcc)
 
         i = 0;
