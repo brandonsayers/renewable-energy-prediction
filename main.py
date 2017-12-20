@@ -3,7 +3,8 @@
 #from LSTM.control_LSTM import control_LSTM as lstmCtrl
 #from LSTM.LSTM_Model import LSTM_Model
 
-import models.superModel as sm
+import superModel as sm
+from pathlib import Path
 
 class mainCtrl():
     def __init__(self, *args):
